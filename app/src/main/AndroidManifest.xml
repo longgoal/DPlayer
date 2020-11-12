@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.example.dplayer">
-
+    package="com.example.dplayer"
+    >
+<!-- android:sharedUserId="android.uid.system"-->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
@@ -29,6 +30,7 @@
         <activity android:name=".opengles.GLShowImageActivity" />
         <activity android:name=".opengles.OpenglesActivity" />
         <activity android:name=".media.MediaActivity" />
+        <activity android:name=".SDcardActivity"/>
         <activity
             android:name=".camera.CameraActivity"
             android:screenOrientation="landscape"

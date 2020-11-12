@@ -33,6 +33,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     private Button mCodecMP4View;
     private Button mCamera2View;
     private Button mExtractorView;
+    private Button mSDcardView;
 
 
     @RequiresApi(api = Build.VERSION_CODES.M)
@@ -73,6 +74,8 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         mCodecMP4View.setOnClickListener(this);
         mExtractorView = findViewById(R.id.extractor_mp4);
         mExtractorView.setOnClickListener(this);
+        mSDcardView = findViewById(R.id.sdcard);
+        mSDcardView.setOnClickListener(this);
 
     }
 
@@ -107,6 +110,9 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 break;
             case R.id.extractor_mp4:
                 ExtractorMp4Activity.startActivity(MainActivity.this);
+                break;
+            case R.id.sdcard:
+                SDcardActivity.startActivity(MainActivity.this);
                 break;
         }
     }

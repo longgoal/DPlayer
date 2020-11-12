@@ -35,10 +35,10 @@ public class AacEncoder {
     public AacEncoder(int sampleRateInHz, int channelConfig, int bufferSizeInBytes) {
         try {
             mAudioEncoder = MediaCodec.createEncoderByType(AUDIO_MIME_TYPE);
-            mMediaFormat = MediaFormat.createAudioFormat(AUDIO_MIME_TYPE, sampleRateInHz, channelConfig == AudioFormat.CHANNEL_OUT_MONO ? 1 : 2);
+            mMediaFormat = MediaFormat.createAudioFormat(AUDIO_MIME_TYPE, sampleRateInHz, channelConfig == AudioFormat.CHANNEL_IN_MONO ? 1 : 2);
             mMediaFormat.setInteger(MediaFormat.KEY_AAC_PROFILE, MediaCodecInfo.CodecProfileLevel.AACObjectLC);
-            mMediaFormat.setInteger(MediaFormat.KEY_CHANNEL_MASK, AudioFormat.CHANNEL_IN_STEREO);//CHANNEL_IN_STEREO 立体声
-            int bitRate = sampleRateInHz * 16 * channelConfig == AudioFormat.CHANNEL_IN_MONO ? 1 : 2;
+            mMediaFormat.setInteger(MediaFormat.KEY_CHANNEL_MASK, channelConfig);//CHANNEL_IN_STEREO 立体声
+            int bitRate = sampleRateInHz * 16 * (channelConfig == AudioFormat.CHANNEL_IN_MONO ? 1 : 2);
             mMediaFormat.setInteger(MediaFormat.KEY_BIT_RATE, bitRate);
             mMediaFormat.setInteger(MediaFormat.KEY_CHANNEL_COUNT, channelConfig == AudioFormat.CHANNEL_IN_MONO ? 1 : 2);
             mMediaFormat.setInteger(MediaFormat.KEY_SAMPLE_RATE, sampleRateInHz);

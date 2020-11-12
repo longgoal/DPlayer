@@ -9,12 +9,16 @@ import android.media.AudioRecord;
 import android.media.MediaRecorder;
 import android.os.Bundle;
 import android.os.Environment;
+import android.util.Log;
 import android.view.SurfaceView;
 import android.view.View;
 import android.widget.Button;
 
 import com.example.dplayer.R;
 import com.example.dplayer.mediacodec.h264.H264Activity;
+
+import java.text.SimpleDateFormat;
+import java.util.Date;
 
 public class Mp4Activity extends AppCompatActivity implements View.OnClickListener {
     public static void startActivity(Context context) {
@@ -24,7 +28,7 @@ public class Mp4Activity extends AppCompatActivity implements View.OnClickListen
 
     public final static int DEFAULT_INPUT = MediaRecorder.AudioSource.MIC;
     public final static int DEFAULT_SAMPLE_RATE_IN_HZ = 44_100;
-    public final static int DEFAULT_CHANNEL_CONFIG = AudioFormat.CHANNEL_IN_STEREO;
+    public final static int DEFAULT_CHANNEL_CONFIG = AudioFormat.CHANNEL_IN_MONO;
     public final static int DEFAULT_ENCODING = AudioFormat.ENCODING_PCM_16BIT;
     public final static int DEFAULT_BUFFER_SIZE_IN_BYTES = AudioRecord.getMinBufferSize(DEFAULT_SAMPLE_RATE_IN_HZ, DEFAULT_CHANNEL_CONFIG, AudioFormat.ENCODING_PCM_16BIT);
     private Mp4Record mMp4Record;
@@ -43,7 +47,11 @@ public class Mp4Activity extends AppCompatActivity implements View.OnClickListen
 
         mStartView.setOnClickListener(this);
         mStopView.setOnClickListener(this);
-        mPath = Environment.getExternalStorageDirectory().getAbsolutePath() + "/media_muxer.mp4";
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd-HH-mm-ss");
+        Date date = new Date(System.currentTimeMillis());
+        String dateSting = sdf.format(date);
+        mPath = Environment.getExternalStorageDirectory().getAbsolutePath() + "/"+"media_muxer-"+dateSting+".mp4";
+        Log.e("eee", "mPath:" +mPath);
         mMp4Record = new Mp4Record(this, mSurfaceView, DEFAULT_INPUT, DEFAULT_SAMPLE_RATE_IN_HZ, DEFAULT_CHANNEL_CONFIG, DEFAULT_ENCODING, DEFAULT_BUFFER_SIZE_IN_BYTES, mPath);
     }
 

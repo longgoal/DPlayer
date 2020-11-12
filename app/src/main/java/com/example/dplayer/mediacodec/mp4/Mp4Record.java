@@ -1,14 +1,25 @@
 package com.example.dplayer.mediacodec.mp4;
 
 import android.app.Activity;
+import android.content.Context;
 import android.media.MediaCodec;
 import android.media.MediaFormat;
 import android.media.MediaMuxer;
+import android.os.Environment;
+import android.os.storage.StorageManager;
+import android.os.storage.StorageVolume;
 import android.util.Log;
 import android.view.SurfaceView;
 
+import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.Array;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
@@ -29,20 +40,31 @@ public class Mp4Record implements H264VideoRecord.Callback, AacAudioRecord.Callb
     private final Object mLock;
     private BlockingQueue<AVData> mDataBlockingQueue;
     private volatile boolean mIsRecoding;
-
+    private long mLastStartSeconds = -1;
+    private long mLogSeconds = -1;
+    private MediaFormat mVideoTrackFormat = null;
+    private MediaFormat mAudioTrackFormat = null;
+    private volatile boolean mIsSwitchMuxer = false;
+    private Context mContext;
+    private String mSDcard;
+    private boolean mIgnoreAudioTrack = false;
     public Mp4Record(Activity activity, SurfaceView surfaceView, int audioSource, int sampleRateInHz, int channelConfig, int audioFormat, int bufferSizeInBytes, String path) {
         mH264VideoRecord = new H264VideoRecord(activity, surfaceView);
         mAacAudioRecord = new AacAudioRecord(audioSource, sampleRateInHz, channelConfig, audioFormat, bufferSizeInBytes);
         mH264VideoRecord.setCallback(this);
         mAacAudioRecord.setCallback(this);
+        mContext = activity;
+        //mSDcard = getStoragePath(mContext,true);
         try {
-            mMediaMuxer = new MediaMuxer(path, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4);
+            mMediaMuxer = new MediaMuxer(generateFilePath(), MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4);
         } catch (IOException e) {
             e.printStackTrace();
         }
         mHasStartMuxer = false;
         mLock = new Object();
         mDataBlockingQueue = new LinkedBlockingQueue<>();
+
+
     }
 
     public void start() {
@@ -60,7 +82,10 @@ public class Mp4Record implements H264VideoRecord.Callback, AacAudioRecord.Callb
 
     @Override
     public void outputAudio(ByteBuffer byteBuffer, MediaCodec.BufferInfo bufferInfo) {
-        writeMediaData(mAudioTrackIndex, byteBuffer, bufferInfo);
+        if(!mIsSwitchMuxer) {
+            if(mIgnoreAudioTrack == false)
+                writeMediaData(mAudioTrackIndex, byteBuffer, bufferInfo);
+        }
     }
 
     @Override
@@ -70,21 +95,32 @@ public class Mp4Record implements H264VideoRecord.Callback, AacAudioRecord.Callb
 
     @Override
     public void outputVideo(ByteBuffer byteBuffer, MediaCodec.BufferInfo bufferInfo) {
-        writeMediaData(mVideoTrackIndex, byteBuffer, bufferInfo);
+        if(!mIsSwitchMuxer)
+            writeMediaData(mVideoTrackIndex, byteBuffer, bufferInfo);
     }
 
     private void writeMediaData(int trackIndex, ByteBuffer byteBuffer, MediaCodec.BufferInfo bufferInfo) {
+        //Log.d("dataflow","add encoded data to queue");
         mDataBlockingQueue.add(new AVData(index++, trackIndex, byteBuffer, bufferInfo));
     }
 
     private void checkMediaFormat(int type, MediaFormat mediaFormat) {
         synchronized (mLock) {
+            //Log.e("ethan","mLock synchronized type="+type);
             if (type == AAC_ENCODER) {
-                mAudioTrackIndex = mMediaMuxer.addTrack(mediaFormat);
+                if(mIgnoreAudioTrack) {
+                    mAudioTrackIndex = 33;
+                    mAudioTrackFormat = null;
+                } else {
+                    mAudioTrackIndex = mMediaMuxer.addTrack(mediaFormat);
+                    mAudioTrackFormat = mediaFormat;
+                }
             }
             if (type == H264_ENCODER) {
                 mVideoTrackIndex = mMediaMuxer.addTrack(mediaFormat);
+                mVideoTrackFormat = mediaFormat;
             }
+            Log.e("ethan","mLock synchronized type="+type+",mAudioTrackIndex="+mAudioTrackIndex+",mVideoTrackIndex="+mVideoTrackIndex);
             startMediaMuxer();
         }
     }
@@ -97,24 +133,47 @@ public class Mp4Record implements H264VideoRecord.Callback, AacAudioRecord.Callb
             Log.e("ethan", "video track index:" + mVideoTrackIndex + "audio track index:" + mAudioTrackIndex);
             mMediaMuxer.start();
             mHasStartMuxer = true;
+            mLastStartSeconds = System.currentTimeMillis()/1000;
+            mLogSeconds = -1;
             new Thread(new Runnable() {
                 @Override
                 public void run() {
                     while (mIsRecoding || !mDataBlockingQueue.isEmpty()) {
+                        long currStartSenconds = System.currentTimeMillis()/1000;
+
+                        if(currStartSenconds - mLastStartSeconds  >= 20) {
+                            Log.d("ethan","laststart="+mLastStartSeconds+",curr="+currStartSenconds);
+                            mIsSwitchMuxer = true;
+                            mLastStartSeconds = System.currentTimeMillis()/1000;
+                            switchMuxer();
+                            mIsSwitchMuxer = false;
+                        }
+                        //Log.d("dataflow","poll encoded data from queue");
                         AVData avData = mDataBlockingQueue.poll();
                         if (avData == null) {
                             continue;
                         }
                         boolean keyFrame = (avData.bufferInfo.flags & MediaCodec.BUFFER_FLAG_KEY_FRAME) != 0;
-                        Log.e("ethan", avData.index + "trackIndex:" + avData.trackIndex + ",writeSampleData:" + keyFrame);
+                        //Log.d("ethan","currStartSenconds%3="+currStartSenconds%3+",currStartSenconds="+currStartSenconds+",mLogSeconds="+mLogSeconds);
+                        if(((currStartSenconds%3  == 0)&&(currStartSenconds != mLogSeconds)) || (keyFrame == true)) {
+                            mLogSeconds = currStartSenconds;
+                            Log.e("ethan", avData.index + "trackIndex:" + avData.trackIndex + ",writeSampleData:" + keyFrame);
+                        }
+                        //Log.d("dataflow","write encoded data to file");
+
+
                         mMediaMuxer.writeSampleData(avData.trackIndex, avData.byteBuffer, avData.bufferInfo);
                     }
                 }
             }).start();
+            Log.e("ethan","mLock notifyAll() begin");
             mLock.notifyAll();
+            Log.e("ethan","mLock notifyAll() end");
         } else {
             try {
+                Log.e("ethan","mLock wait() begin");
                 mLock.wait();
+                Log.e("ethan","mLock wait() end");
             } catch (InterruptedException e) {
 
             }
@@ -149,7 +208,85 @@ public class Mp4Record implements H264VideoRecord.Callback, AacAudioRecord.Callb
             this.byteBuffer = byteBuffer;
             this.bufferInfo = bufferInfo;
             boolean keyFrame = (bufferInfo.flags & MediaCodec.BUFFER_FLAG_KEY_FRAME) != 0;
-            Log.e("ethan", index + "trackIndex:" + trackIndex + ",AVData:" + keyFrame);
+            //Log.e("ethan", index + "trackIndex:" + trackIndex + ",AVData:" + keyFrame);
         }
+    }
+    private String generateFilePath() {
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd-HH-mm-ss");
+        String sdcard = getStoragePath(mContext,true);
+        Date date = new Date(System.currentTimeMillis());
+        String dateSting = sdf.format(date);
+        String path;
+        if(sdcard == null) {
+            File file = new File(Environment.getExternalStorageDirectory().getAbsolutePath()+"/DPlayer");
+            if(!file.exists())
+                file.mkdir();
+            path = Environment.getExternalStorageDirectory().getAbsolutePath() + "/DPlayer/" + "media_muxer-" + dateSting + ".mp4";
+        }else{
+            File file = new File(sdcard+"/DPlayer");
+            if(!file.exists())
+                file.mkdir();
+            path = sdcard+"/DPlayer/" + "media_muxer-" + dateSting + ".mp4";
+        }
+        Log.d("ethan","path="+path);
+        return path;
+    }
+    private static String getStoragePath(Context mContext, boolean is_removale) {
+
+        StorageManager mStorageManager = (StorageManager) mContext.getSystemService(Context.STORAGE_SERVICE);
+        Class<?> storageVolumeClazz = null;
+        is_removale = false;
+        try {
+            storageVolumeClazz = Class.forName("android.os.storage.StorageVolume");
+            Method getVolumeList = mStorageManager.getClass().getMethod("getVolumeList");
+            Method getPath = storageVolumeClazz.getMethod("getPath");
+            Method isRemovable = storageVolumeClazz.getMethod("isRemovable");
+            Object result = getVolumeList.invoke(mStorageManager);
+            final int length = Array.getLength(result);
+            for (int i = 0; i < length; i++) {
+                Object storageVolumeElement = Array.get(result, i);
+                String path = (String) getPath.invoke(storageVolumeElement);
+                boolean removable = (Boolean) isRemovable.invoke(storageVolumeElement);
+                if (is_removale == removable) {
+                    return path;
+                }
+            }
+        } catch (ClassNotFoundException e) {
+            e.printStackTrace();
+        } catch (InvocationTargetException e) {
+            e.printStackTrace();
+        } catch (NoSuchMethodException e) {
+            e.printStackTrace();
+        } catch (IllegalAccessException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+    private MediaMuxer generateMuxer() {
+        MediaMuxer mediaMuxer = null;
+        try {
+            mMediaMuxer = new MediaMuxer(generateFilePath(), MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return mediaMuxer;
+    }
+    private void switchMuxer() {
+        mMediaMuxer.stop();
+        mMediaMuxer = null;
+        try {
+            mMediaMuxer = new MediaMuxer(generateFilePath(), MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        if(mIgnoreAudioTrack) {
+            mAudioTrackIndex = 33;
+            mAudioTrackFormat = null;
+        } else {
+            mAudioTrackIndex = mMediaMuxer.addTrack(mAudioTrackFormat);
+        }
+
+        mVideoTrackIndex = mMediaMuxer.addTrack(mVideoTrackFormat);
+        mMediaMuxer.start();
     }
 }

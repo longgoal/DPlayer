@@ -5,6 +5,7 @@ import android.app.Activity;
 import android.graphics.ImageFormat;
 import android.hardware.Camera;
 import android.util.DisplayMetrics;
+import android.util.Log;
 import android.view.Surface;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
@@ -173,6 +174,8 @@ public class CameraHelper {
                 mPreHeight = 720;
             }
 
+            mPreWidth = 1920;
+            mPreHeight = 1080;
 
             mCameraParameters.setPreviewSize(mPreWidth, mPreHeight);
 
@@ -221,6 +224,7 @@ public class CameraHelper {
             Camera.Size size = camera.getParameters().getPreviewSize();
             //通过回调,拿到的data数据是原始数据
             //丢给VideoRunnable线程,使用MediaCodec进行h264编码操作
+            //Log.d("dataflow","camera frame callback"+data.length);
             if (data != null) {
                 if (mPreviewCallback != null) {
                     mPreviewCallback.onFrame(data);

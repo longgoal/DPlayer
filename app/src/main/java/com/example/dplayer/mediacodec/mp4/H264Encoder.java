@@ -1,5 +1,6 @@
 package com.example.dplayer.mediacodec.mp4;
 
+import android.graphics.ImageFormat;
 import android.media.MediaCodec;
 import android.media.MediaCodecInfo;
 import android.media.MediaCodecList;
@@ -55,20 +56,27 @@ public class H264Encoder {
         mHeight = height;
         mQueue = new LinkedBlockingQueue<>();
         mMediaCodecInfo = selectCodecInfo();
+
         mColorFormat = selectColorFormat(mMediaCodecInfo);
         mBitRate = (mWidth * mHeight * 3 / 2) * 8 * fps;
+        mBitRate = 30000000;
+        Log.e("eee", "name="+mMediaCodecInfo.getName()+",bitrate="+mBitRate);
         mMediaFormat = MediaFormat.createVideoFormat(VIDEO_MIME_TYPE, mHeight, mWidth);
         mMediaFormat.setInteger(MediaFormat.KEY_BIT_RATE, mBitRate);// todo 没有这一行会报错 configureCodec returning error -38
         mMediaFormat.setInteger(MediaFormat.KEY_FRAME_RATE, fps);
         mMediaFormat.setInteger(MediaFormat.KEY_COLOR_FORMAT, mColorFormat);
-        mMediaFormat.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 5);
+        mMediaFormat.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1);
 
         try {
             mMediaCodec = MediaCodec.createByCodecName(mMediaCodecInfo.getName());
         } catch (IOException e) {
             e.printStackTrace();
         }
-        mMediaCodec.configure(mMediaFormat, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE);
+        try {
+            mMediaCodec.configure(mMediaFormat, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE);
+        }catch (Exception e){
+            e.printStackTrace();
+        }
         mExecutorService = Executors.newFixedThreadPool(1);
 
         mYUVBuffer = new byte[YUVUtil.getYUVBuffer(width, height)];
@@ -117,6 +125,7 @@ public class H264Encoder {
             return null;
         }
         try {
+            //Log.d("dataflow","take camera frame from queue");
             return mQueue.take();
         } catch (InterruptedException e) {
             e.printStackTrace();
@@ -129,6 +138,7 @@ public class H264Encoder {
             return;
         }
         try {
+            //Log.d("dataflow","put camera frame to queue"+data.length);
             mQueue.put(data);
         } catch (InterruptedException e) {
             e.printStackTrace();
@@ -166,6 +176,7 @@ public class H264Encoder {
             if (bufferInfo.size != 0 && mCallback != null) {
 //                boolean keyFrame = (bufferInfo.flags & MediaCodec.BUFFER_FLAG_KEY_FRAME) != 0;
 //                Log.i("ethan", "is key frame :%s"+keyFrame);
+                //Log.d("dataflow","finish encoded data");
                 mCallback.onEncodeOutput(byteBuffer, bufferInfo);
             }
             mMediaCodec.releaseOutputBuffer(outputIndex, false);
@@ -198,6 +209,7 @@ public class H264Encoder {
                 //Log.i("transferFrameData", "COLOR_FormatYUV420PackedPlanar");
                 break;
         }
+        //Log.d("dataflow","transfer camera frame from color:"+ ImageFormat.NV21+" to color:"+mColorFormat);
         return rotatedYuvBuffer;
     }
 

@@ -719,7 +719,7 @@ void YuvEngine::Nv12ClockWiseRotate90(unsigned char* pNv12,int srcWidth,int srcH
 
     *outWidth = srcHeight;
     *outHeight = srcWidth;
-    LOGD("%s: outWidth: %d,outHeight:%d",__FUNCTION__,*outWidth,*outHeight);
+    //LOGD("%s: outWidth: %d,outHeight:%d",__FUNCTION__,*outWidth,*outHeight);
 }
 
 void YuvEngine::Yv12ClockWiseRotate90(unsigned char* pYv12,int srcWidth,int srcHeight, unsigned char* outData,int* outWidth,int* outHeight)

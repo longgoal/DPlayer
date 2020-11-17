@@ -225,6 +225,7 @@ public class CameraHelper {
             //通过回调,拿到的data数据是原始数据
             //丢给VideoRunnable线程,使用MediaCodec进行h264编码操作
             //Log.d("dataflow","camera frame callback"+data.length);
+            //Log.d("ethan","onPreviewFrame data="+data.hashCode());
             if (data != null) {
                 if (mPreviewCallback != null) {
                     mPreviewCallback.onFrame(data);

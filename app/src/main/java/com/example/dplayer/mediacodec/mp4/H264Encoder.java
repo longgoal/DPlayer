@@ -126,6 +126,10 @@ public class H264Encoder {
         }
         try {
             //Log.d("dataflow","take camera frame from queue");
+            //Log.d("ethan","dequeueData"+",before take mQueue.size()"+mQueue.size());
+            //byte[] data = mQueue.take();
+            //Log.d("ethan","dequeueData="+data.hashCode()+",after take mQueue.size()"+mQueue.size());
+            //return data;
             return mQueue.take();
         } catch (InterruptedException e) {
             e.printStackTrace();
@@ -138,8 +142,9 @@ public class H264Encoder {
             return;
         }
         try {
-            //Log.d("dataflow","put camera frame to queue"+data.length);
+            //Log.d("ethan","queueData="+data.hashCode()+",before put mQueue.size()"+mQueue.size());
             mQueue.put(data);
+            //Log.d("ethan","queueData="+data.hashCode()+",after put mQueue.size()"+mQueue.size());
         } catch (InterruptedException e) {
             e.printStackTrace();
         }

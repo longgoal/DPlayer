@@ -2,16 +2,28 @@ package com.example.dplayer.mediacodec.mp4;
 
 import android.app.Activity;
 import android.content.Context;
+import android.content.Intent;
+import android.content.SharedPreferences;
 import android.media.MediaCodec;
 import android.media.MediaFormat;
 import android.media.MediaMuxer;
+import android.net.Uri;
 import android.os.Environment;
+import android.os.ParcelFileDescriptor;
 import android.os.storage.StorageManager;
 import android.os.storage.StorageVolume;
+import android.text.TextUtils;
 import android.util.Log;
 import android.view.SurfaceView;
+import android.widget.Toast;
+
+import androidx.documentfile.provider.DocumentFile;
+
+import com.example.dplayer.MyApp;
 
 import java.io.File;
+import java.io.FileDescriptor;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.lang.reflect.Array;
 import java.lang.reflect.InvocationTargetException;
@@ -45,7 +57,7 @@ public class Mp4Record implements H264VideoRecord.Callback, AacAudioRecord.Callb
     private MediaFormat mVideoTrackFormat = null;
     private MediaFormat mAudioTrackFormat = null;
     private volatile boolean mIsSwitchMuxer = false;
-    private Context mContext;
+    private Activity mContext;
     private String mSDcard;
     private boolean mIgnoreAudioTrack = false;
     public Mp4Record(Activity activity, SurfaceView surfaceView, int audioSource, int sampleRateInHz, int channelConfig, int audioFormat, int bufferSizeInBytes, String path) {
@@ -57,6 +69,9 @@ public class Mp4Record implements H264VideoRecord.Callback, AacAudioRecord.Callb
         //mSDcard = getStoragePath(mContext,true);
         try {
             mMediaMuxer = new MediaMuxer(generateFilePath(), MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4);
+            //FileDescriptor fd = generateFileDescripter();
+            //mMediaMuxer = new MediaMuxer(fd, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4);
+
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -211,6 +226,44 @@ public class Mp4Record implements H264VideoRecord.Callback, AacAudioRecord.Callb
             //Log.e("ethan", index + "trackIndex:" + trackIndex + ",AVData:" + keyFrame);
         }
     }
+    private FileDescriptor generateFileDescripter(){
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd-HH-mm-ss");
+        Date date = new Date(System.currentTimeMillis());
+        String dateSting = sdf.format(date);
+        FileDescriptor df;
+        MyApp myApp = (MyApp)mContext.getApplication();
+        Uri rootUri = myApp.getRootUri();
+        rootUri = getTreeUri();
+        DocumentFile documentDir = DocumentFile.fromTreeUri(mContext, rootUri);
+        DocumentFile documentFile = documentDir.createFile("video/mp4",dateSting+".mp4");
+        Uri getUri = documentFile.getUri();
+        try {
+            ParcelFileDescriptor pfd = mContext.getContentResolver().openFileDescriptor(getUri, "rwt");
+
+            FileDescriptor fileDescriptor = pfd.getFileDescriptor();
+
+            Log.e("ethan","path="+getUri);
+            return fileDescriptor;
+        }catch (Exception e) {
+            e.printStackTrace();
+        }
+        return new FileDescriptor();
+
+    }
+    private Uri getTreeUri(){
+        SharedPreferences sf = mContext.getSharedPreferences("treeUri",Context.MODE_PRIVATE);
+        String uriString = sf.getString("treeUri","");
+        if(TextUtils.isEmpty(uriString)){
+            Toast.makeText(mContext,"no treeUri",Toast.LENGTH_SHORT).show();
+        }else {
+            Uri uri = Uri.parse(uriString);
+            int takeflags = sf.getInt("treeUriFlags", Intent.FLAG_GRANT_READ_URI_PERMISSION
+                    | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+            mContext.getContentResolver().takePersistableUriPermission(uri,takeflags);
+            return uri;
+        }
+        return null;
+    }
     private String generateFilePath() {
         SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd-HH-mm-ss");
         String sdcard = getStoragePath(mContext,true);
@@ -275,6 +328,7 @@ public class Mp4Record implements H264VideoRecord.Callback, AacAudioRecord.Callb
         mMediaMuxer.stop();
         mMediaMuxer = null;
         try {
+            //mMediaMuxer = new MediaMuxer(generateFileDescripter(), MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4);
             mMediaMuxer = new MediaMuxer(generateFilePath(), MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4);
         } catch (IOException e) {
             e.printStackTrace();
